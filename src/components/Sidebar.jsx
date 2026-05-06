@@ -13,20 +13,17 @@ export default function Sidebar({
     const load = async () => {
       setLoading(true);
       try {
-        // GET /conversations
         const data = await api.getConversations();
         const list = Array.isArray(data) ? data : (data?.conversations || data?.data || []);
-        // GET /conversations returns:
-        // [{ user_id, display_name, username, last_message_at }]
         const mapped = list.map(c => ({
-          id:       c.user_id,           // use user_id as the conversation key
-          userId:   c.user_id,           // the other user's ID
+          id:       c.user_id,           
+          userId:   c.user_id,           
           username: c.username,
           displayName: c.display_name,
           lastMessageAt: c.last_message_at,
         }));
         setConversations(mapped);
-      } catch { /* silent */ }
+      } catch {}
       setLoading(false);
     };
     load();

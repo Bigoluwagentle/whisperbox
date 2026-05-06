@@ -19,7 +19,6 @@ export default function NewConversationModal({ onClose, onSelect }) {
       setLoading(true);
       setError('');
       try {
-        // GET /users/search?q=...
         const data = await api.searchUsers(query.trim());
         const list = Array.isArray(data) ? data : (data?.users || data?.results || []);
         setResults(list);

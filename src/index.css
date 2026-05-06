@@ -1,6 +1,3 @@
-/* WhisperBox — Cipher Terminal Aesthetic */
-/* Font: Syne (headings) + JetBrains Mono (body/code) */
-
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -57,16 +54,13 @@ html, body {
   flex-direction: column;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
-/* Selection */
 ::selection { background: var(--accent-dim); color: var(--accent); }
 
-/* Button reset */
 button {
   font-family: var(--font-mono);
   cursor: pointer;
@@ -83,14 +77,12 @@ input, textarea {
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-/* ── Utility classes ── */
 .sr-only {
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0,0,0,0); border: 0;
 }
 
-/* ── Scan-line overlay ── */
 body::after {
   content: '';
   position: fixed;
@@ -106,7 +98,6 @@ body::after {
   z-index: 9999;
 }
 
-/* ── Noise texture ── */
 .noise::before {
   content: '';
   position: absolute;
@@ -116,7 +107,6 @@ body::after {
   border-radius: inherit;
 }
 
-/* ── Animations ── */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -145,7 +135,6 @@ body::after {
 .animate-fade { animation: fadeIn 0.25s ease both; }
 .animate-slide { animation: slideIn 0.2s ease both; }
 
-/* ── Encrypted badge ── */
 .enc-badge {
   display: inline-flex;
   align-items: center;
@@ -168,7 +157,6 @@ body::after {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ── Lock icon inline ── */
 .lock-icon {
   display: inline-flex;
   align-items: center;

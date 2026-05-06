@@ -1,12 +1,3 @@
-/**
- * MessagePane.jsx
- *
- * - Primary delivery: WebSocket (message.send frame)
- * - Fallback: REST POST /messages
- * - History: GET /conversations/{userId}/messages (paginated, newest-first → reversed)
- * - Real-time: listens to wsClient.onMessage for message.receive frames
- */
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import * as api from '../utils/api';
@@ -31,9 +22,6 @@ export default function MessagePane({ conv, onMessageSent }) {
   const bottomRef = useRef(null);
   const oldestCursor = useRef(null);
 
-  // ── Decrypt a single message from GET /conversations/{userId}/messages ──────
-  // Message shape: { id, from_user_id, to_user_id, payload: { ciphertext, iv,
-  //                  encryptedKey, encryptedKeyForSelf }, delivered, created_at }
   const decryptMsg = useCallback(async (m) => {
     try {
       const myId  = user?.id;
@@ -41,7 +29,6 @@ export default function MessagePane({ conv, onMessageSent }) {
       let plaintext;
 
       if (isMine) {
-        // Sender reads their own message using encryptedKeyForSelf
         plaintext = await decryptSentMessage(
           {
             ciphertext:          m.payload.ciphertext,
@@ -51,7 +38,6 @@ export default function MessagePane({ conv, onMessageSent }) {
           privateKey
         );
       } else {
-        // Recipient decrypts using encryptedKey
         plaintext = await decryptReceivedMessage(
           {
             ciphertext:   m.payload.ciphertext,
@@ -68,9 +54,6 @@ export default function MessagePane({ conv, onMessageSent }) {
     }
   }, [privateKey, user]);
 
-  // ── Load history ──────────────────────────────────────────────────────────
-  // GET /conversations/{userId}/messages → array, newest-first
-  // Pagination: ?before=<ISO-8601 timestamp>
   const loadHistory = useCallback(async () => {
     if (!conv || !privateKey) return;
     setLoading(true);
@@ -78,15 +61,12 @@ export default function MessagePane({ conv, onMessageSent }) {
       const msgs = await api.getMessages(conv.userId);
       const arr  = Array.isArray(msgs) ? msgs : [];
 
-      // API returns newest-first — reverse so oldest is at top
       const chronological = [...arr].reverse();
 
-      // Store oldest timestamp for "load more" cursor
       if (chronological.length > 0) {
         oldestCursor.current = chronological[0].created_at;
       }
 
-      // If we got a full page (50 default) there may be more
       setHasMore(arr.length >= 50);
 
       const decrypted = await Promise.all(chronological.map(decryptMsg));
@@ -98,18 +78,16 @@ export default function MessagePane({ conv, onMessageSent }) {
     }
   }, [conv, privateKey, decryptMsg]);
 
-  // ── Load older messages (pagination) ─────────────────────────────────────
   const loadMore = async () => {
     if (!hasMore || loadingMore || !oldestCursor.current) return;
     setLoadingMore(true);
     try {
-      // ?before=<ISO-8601> returns messages older than that timestamp
       const msgs = await api.getMessages(conv.userId, oldestCursor.current);
       const arr  = Array.isArray(msgs) ? msgs : [];
       if (arr.length === 0) { setHasMore(false); return; }
 
       const chronological = [...arr].reverse();
-      oldestCursor.current = chronological[0].created_at; // oldest in this page
+      oldestCursor.current = chronological[0].created_at; 
       setHasMore(arr.length >= 50);
 
       const decrypted = await Promise.all(chronological.map(decryptMsg));
@@ -121,15 +99,9 @@ export default function MessagePane({ conv, onMessageSent }) {
     }
   };
 
-  // ── Handle real-time incoming WS message.receive frame ───────────────────
-  // Frame shape: { event: "message.receive", id, from_user_id, to_user_id,
-  //                payload: { ciphertext, iv, encryptedKey, encryptedKeyForSelf },
-  //                created_at }
   const handleIncoming = useCallback(async (frame) => {
-    // Only handle messages from the currently open conversation
     if (frame.from_user_id !== conv.userId) return;
 
-    // Build a message object matching the REST history shape for decryptMsg
     const msg = {
       id:          frame.id,
       from_user_id: frame.from_user_id,
@@ -140,7 +112,6 @@ export default function MessagePane({ conv, onMessageSent }) {
 
     const decrypted = await decryptMsg(msg);
     setMessages(prev => {
-      // Deduplicate by id
       if (prev.find(m => m.id === decrypted.id)) return prev;
       return [...prev, decrypted];
     });
@@ -153,19 +124,15 @@ export default function MessagePane({ conv, onMessageSent }) {
     loadHistory();
   }, [loadHistory]);
 
-  // Register WS listener for this conversation
   useEffect(() => {
-    // wsClient.onMessage passes the full message.receive frame
     const unsub = wsClient.onMessage(handleIncoming);
     return unsub;
   }, [handleIncoming]);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Send ──────────────────────────────────────────────────────────────────
   const sendMsg = async () => {
     if (!input.trim() || sending) return;
     setError('');
@@ -173,18 +140,15 @@ export default function MessagePane({ conv, onMessageSent }) {
     const text = input.trim();
     setInput('');
     try {
-      // 1. Fetch recipient's RSA public key and encrypt the message
       const recipientPub = await getRecipientPublicKey(conv.userId);
       const ownPub       = await getOwnPublicKey();
       const payload      = await encryptMessage(text, recipientPub, ownPub);
 
-      // 2. Try WebSocket first (primary), fall back to REST POST /messages
       const sentViaWS = wsClient.sendMessage(conv.userId, payload);
       if (!sentViaWS) {
         await api.sendMessageREST(conv.userId, payload);
       }
 
-      // 3. Optimistically add sent message — shape matches decryptMsg expectation
       const optimistic = {
         id:           `opt-${Date.now()}`,
         from_user_id: user?.id,
@@ -196,7 +160,7 @@ export default function MessagePane({ conv, onMessageSent }) {
           encryptedKeyForSelf: payload.encryptedKeyForSelf,
         },
         created_at:   new Date().toISOString(),
-        plaintext:    text,   // already known — skip re-decryption
+        plaintext:    text,  
         decrypted:    true,
         isMine:       true,
       };
@@ -204,7 +168,7 @@ export default function MessagePane({ conv, onMessageSent }) {
       onMessageSent?.();
     } catch (e) {
       setError(e.message || 'Failed to send');
-      setInput(text); // restore on failure
+      setInput(text); 
     } finally {
       setSending(false);
     }
@@ -239,7 +203,6 @@ export default function MessagePane({ conv, onMessageSent }) {
         <span className="enc-badge"><span className="dot"></span>AES-256-GCM · RSA-OAEP</span>
       </div>
 
-      {/* Load more */}
       {hasMore && (
         <div className={styles.loadMoreBar}>
           <button className={styles.loadMoreBtn} onClick={loadMore} disabled={loadingMore}>
@@ -248,7 +211,6 @@ export default function MessagePane({ conv, onMessageSent }) {
         </div>
       )}
 
-      {/* Messages */}
       <div className={styles.messages}>
         {loading ? (
           <div className={styles.loadingState}>
@@ -268,7 +230,6 @@ export default function MessagePane({ conv, onMessageSent }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Error bar */}
       {error && (
         <div className={styles.errorBar}>
           ⚠ {error}
@@ -276,7 +237,6 @@ export default function MessagePane({ conv, onMessageSent }) {
         </div>
       )}
 
-      {/* Input */}
       <div className={styles.inputArea}>
         <div className={styles.inputWrap}>
           <div className={styles.lockIcon}><LockMiniIcon /></div>
