@@ -206,7 +206,7 @@ Unlike a naive IndexedDB-only design, this app supports any device login because
 git clone https://github.com/bigoluwagentle/whisperbox.git
 cd whisperbox
 npm install
-npm run dev       # http://localhost:5173
+npm run dev       # http://localhost:5173 https://whisperbox-five.vercel.app/
 ```
 
 > Web Crypto API requires a **secure context** (`https://` or `localhost`). Works out of the box in dev.
